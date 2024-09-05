@@ -4,8 +4,8 @@
 # Site: https://jornada365.cloud
 # "Faca parte desta jornada voce tambem!"
 # Compatibilidade:
-# - Windows 10 (20H2 e posterior)
-# - Windows 11 (todas as versoes)
+# - Windows 10 Pro
+# - Windows 11 Pro
 # ===============================================
 # Este script bloqueia a instalacao de novos aplicativos 
 # na Microsoft Store e habilita atualizacoes automaticas 
