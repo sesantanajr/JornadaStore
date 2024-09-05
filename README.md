@@ -26,7 +26,7 @@ Para usar o **JornadaStore**, siga estas etapas simples:
 2. Execute o *BlockStore.ps1* para desabilitar a Microsoft Store.
 3. Execute o *EnableStore.ps1* quando quiser restaurar o acesso.
 
-Confira mais detalhes no repositório [JornadaStore](https://github.com/sesantanajr/JornadaStore).
+Confira mais detalhes no Jornada 365 [JornadaStore]([https://github.com/sesantanajr/JornadaStore](https://jornada365.cloud/bloqueando-a-loja-de-aplicativos-do-windows-pro-com-microsoft-intune/)).
 
 ### Contribuição
 Contribuições são bem-vindas! Sinta-se à vontade para criar issues ou enviar pull requests para melhorias no repositório.
