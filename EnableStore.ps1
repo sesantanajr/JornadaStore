@@ -26,7 +26,7 @@ try {
     # ============================
 
     # Caminho do registro onde a politica para habilitar instalacao sera aplicada
-    $registryPathStore = "HKLM:\\SOFTWARE\\Policies\\Microsoft\\WindowsStore"
+    $registryPathStore = "HKLM:\SOFTWARE\Policies\Microsoft\WindowsStore"
     
     # Nome da chave de registro que sera criada/modificada
     $registryNameStore = "DisableStoreApps"
@@ -59,16 +59,20 @@ try {
     # FORCAR ATUALIZACAO DE POLITICAS SEM REINICIAR
     # ============================
 
-    # Utiliza gpupdate para forcar a atualizacao de politicas de grupo sem interrupcoes para o usuario
+    # Utiliza Invoke-Expression para garantir que o gpupdate seja executado sem falhas no Intune
     Write-Host "Forcando a atualizacao das politicas de grupo..."
-    gpupdate /target:computer /force | Out-Null
-    gpupdate /target:user /force | Out-Null
+    Invoke-Expression -Command 'gpupdate /target:computer /force'
+    Invoke-Expression -Command 'gpupdate /target:user /force'
     Write-Host "As politicas foram aplicadas com sucesso sem reiniciar o sistema."
 
-    # Opcional: Invalida e atualiza as politicas de cache para garantir que qualquer politica armazenada seja renovada
+    # ============================
+    # RENOVACAO DE POLITICAS NO INTUNE
+    # ============================
+
+    # Utiliza secedit para forcar a renovacao de politicas de cache
     Write-Host "Renovando politicas de cache do Windows..."
-    secedit /refreshpolicy machine_policy /enforce | Out-Null
-    secedit /refreshpolicy user_policy /enforce | Out-Null
+    Invoke-Expression -Command 'secedit /refreshpolicy machine_policy /enforce'
+    Invoke-Expression -Command 'secedit /refreshpolicy user_policy /enforce'
     Write-Host "Politicas de cache renovadas com sucesso."
 
 } catch {
