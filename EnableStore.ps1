@@ -13,8 +13,6 @@
 # Totalmente compativel com Microsoft Intune.
 # ===============================================
 
-# Script para desbloquear a Microsoft Store (compatível com Intune)
-
 # Função para registrar log
 function Write-Log {
     param($message)
