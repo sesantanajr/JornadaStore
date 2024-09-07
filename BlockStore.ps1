@@ -13,71 +13,47 @@
 # com Microsoft Intune.
 # ===============================================
 
-# Forca a execucao com privilegios de administrador
-if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
-    Write-Host "Este script requer privilegios de administrador. Execute novamente com direitos administrativos."
-    exit
-}
-
-# Bloco try/catch para garantir que erros sejam tratados corretamente
 try {
-    # ============================
-    # BLOQUEAR INSTALACAO DE APPS
-    # ============================
-
-    # Caminho do registro onde a politica para bloquear instalacao sera aplicada
-    $registryPathStore = "HKLM:\SOFTWARE\Policies\Microsoft\WindowsStore"
-    
-    # Nome da chave de registro que sera criada/modificada
-    $registryNameStore = "DisableStoreApps"
-    $registryValueStore = 1 # 1 = Bloquear instalacao de apps
-    
-    # Verifica se o caminho do registro ja existe
-    if (-not (Test-Path $registryPathStore)) {
-        Write-Host "O caminho do registro da Microsoft Store nao existe. Criando o caminho..."
-        # Cria o caminho do registro
-        New-Item -Path $registryPathStore -Force | Out-Null
+    # Verifica se o script está sendo executado com permissões de administrador
+    if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
+        throw "O script deve ser executado com permissões de administrador."
     }
 
-    # Define o valor da chave de registro para bloquear a instalacao de apps pela Microsoft Store
-    Set-ItemProperty -Path $registryPathStore -Name $registryNameStore -Value $registryValueStore -Type DWord
-    Write-Host "Instalacao de aplicativos bloqueada com sucesso na Microsoft Store."
-    
-    # ================================
-    # HABILITAR ATUALIZACOES AUTOMATICAS
-    # ================================
+    # Caminho da GPO para bloquear a Microsoft Store (via registro)
+    $gpoPath = "HKLM:\Software\Policies\Microsoft\WindowsStore"
+    $gpoName = "RemoveWindowsStore"
+    $gpoValue = 1
 
-    # Nome da chave de registro para habilitar as atualizacoes automaticas
-    $registryNameAutoUpdate = "AutoDownload"
-    $registryValueAutoUpdate = 4 # 4 = Baixar e instalar atualizacoes automaticamente
-    
-    # Define o valor da chave de registro para habilitar as atualizacoes automaticas da Microsoft Store
-    Set-ItemProperty -Path $registryPathStore -Name $registryNameAutoUpdate -Value $registryValueAutoUpdate -Type DWord
-    Write-Host "Atualizacoes automaticas habilitadas com sucesso para a Microsoft Store e aplicativos existentes."
+    # Cria o caminho da política se ele não existir
+    if (-not (Test-Path $gpoPath)) {
+        New-Item -Path $gpoPath -Force
+    }
 
-    # ============================
-    # FORCAR ATUALIZACAO DE POLITICAS SEM REINICIAR
-    # ============================
+    # Bloqueia a Store via política de grupo
+    Set-ItemProperty -Path $gpoPath -Name $gpoName -Value $gpoValue
+    Write-Host "Política de bloqueio da Microsoft Store aplicada com sucesso."
 
-    # Utiliza Invoke-Expression para garantir que o gpupdate seja executado sem falhas no Intune
-    Write-Host "Forcando a atualizacao das politicas de grupo..."
-    Invoke-Expression -Command 'gpupdate /target:computer /force'
-    Invoke-Expression -Command 'gpupdate /target:user /force'
-    Write-Host "As politicas foram aplicadas com sucesso sem reiniciar o sistema."
+    # Habilita atualizações automáticas dos aplicativos da Microsoft Store
+    $autoUpdatePath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsStore\WindowsUpdate"
+    if (-not (Test-Path $autoUpdatePath)) {
+        New-Item -Path $autoUpdatePath -Force
+    }
+    Set-ItemProperty -Path $autoUpdatePath -Name "AutoDownload" -Value 4  # Habilita atualizações automáticas
+    Write-Host "Atualizações automáticas dos aplicativos da Store habilitadas."
 
-    # ============================
-    # RENOVACAO DE POLITICAS NO INTUNE
-    # ============================
+    # Regras de Firewall para bloquear o tráfego da Microsoft Store
+    Write-Host "Aplicando regras de firewall para bloquear o tráfego da Microsoft Store..."
 
-    # Utiliza secedit para forcar a renovacao de politicas de cache
-    Write-Host "Renovando politicas de cache do Windows..."
-    Invoke-Expression -Command 'secedit /refreshpolicy machine_policy /enforce'
-    Invoke-Expression -Command 'secedit /refreshpolicy user_policy /enforce'
-    Write-Host "Politicas de cache renovadas com sucesso."
+    # Cria uma regra para bloquear a Store
+    netsh advfirewall firewall add rule name="Block Microsoft Store" dir=out action=block remoteip=13.107.4.50,13.107.5.50 enable=yes
+
+    Write-Host "Regras de firewall aplicadas com sucesso."
 
 } catch {
-    # Exibe uma mensagem de erro detalhada caso ocorra algum problema durante a execucao
-    Write-Host "Ocorreu um erro ao tentar configurar as politicas: $_"
+    Write-Host "Erro ao aplicar a política de bloqueio: $_"
+    $error | Out-File -FilePath "C:\Logs\MicrosoftStore_Block_Firewall_Error.log" -Append
+} finally {
+    Write-Host "Processo de bloqueio concluído."
 }
 
 # ===============================================
