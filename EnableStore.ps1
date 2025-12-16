@@ -1,39 +1,42 @@
 # ===============================================
 # EnableStore | Jornada 365
+# Reverte bloqueios da Microsoft Store
 # ===============================================
-# Site: https://jornada365.cloud
-# "Faca parte desta jornada voce tambem!"
-# Compatibilidade:
-# - Windows 10 (20H2 e posterior)
-# - Windows 11 (todas as versoes)
-# ===============================================
-# Este script habilita a instalacao de novos aplicativos 
-# na Microsoft Store e tambem mantem habilitadas as 
-# atualizacoes automaticas para aplicativos ja instalados. 
-# Totalmente compativel com Microsoft Intune.
-# ===============================================
+
+$ErrorActionPreference = 'Stop'
 
 try {
-    # Define the registry path
-    $registryPath = "HKLM:\SOFTWARE\Policies\Microsoft\WindowsStore"
+    Write-Host "Revertendo políticas e habilitando Microsoft Store..."
 
-    # Define the name and value for the registry key
-    $registryName = "RequirePrivateStoreOnly"
-    $registryValue = 0
-
-    # Check if the registry path exists, create it if it doesn't
-    if (-not (Test-Path $registryPath)) {
-        New-Item -Path $registryPath -Force
+    # Caminho principal de políticas da Store
+    $storePolicyPath = "HKLM:\SOFTWARE\Policies\Microsoft\WindowsStore"
+    if (-not (Test-Path $storePolicyPath)) {
+        New-Item -Path $storePolicyPath -Force | Out-Null
     }
 
-    # Set the registry key value
-    Set-ItemProperty -Path $registryPath -Name $registryName -Value $registryValue -Type DWord
+    # 1) RequirePrivateStoreOnly = 0 (não força só Private Store)
+    New-ItemProperty -Path $storePolicyPath -Name "RequirePrivateStoreOnly" `
+        -PropertyType DWord -Value 0 -Force | Out-Null
 
-    Write-Host "Registry key set successfully."
-} catch {
-    Write-Host "An error occurred: $_"
+    # 2) RemoveWindowsStore - remove se existir
+    Remove-ItemProperty -Path $storePolicyPath -Name "RemoveWindowsStore" `
+        -ErrorAction SilentlyContinue
+
+    # 3) AutoDownload - remove qualquer policy que altere o comportamento padrão
+    Remove-ItemProperty -Path $storePolicyPath -Name "AutoDownload" `
+        -ErrorAction SilentlyContinue
+
+    # 4) NoWindowsStore em Explorer - remove se existir
+    $explorerPolicyPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer"
+    if (Test-Path $explorerPolicyPath) {
+        Remove-ItemProperty -Path $explorerPolicyPath -Name "NoWindowsStore" `
+            -ErrorAction SilentlyContinue
+    }
+
+    Write-Host "Microsoft Store habilitada. Reinicie o dispositivo ou rode 'gpupdate /force'."
+    exit 0
 }
-
-# ===============================================
-# Fim do Script
-# ===============================================
+catch {
+    Write-Host "Erro ao reverter políticas: $($_.Exception.Message)"
+    exit 1
+}
