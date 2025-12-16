@@ -1,48 +1,55 @@
 # ===============================================
 # BlockStore | Jornada 365
+# Bloqueia a Microsoft Store (UI/catalogo)
+# Mantém atualizações automáticas dos apps já instalados
+# Compatível com Windows 10/11 (Pro/Enterprise/Education)
 # ===============================================
-# Site: https://jornada365.cloud
-# "Faca parte desta jornada voce tambem!"
-# Compatibilidade:
-# - Windows 10 Pro
-# - Windows 11 Pro
-# ===============================================
-# Este script bloqueia a instalacao de novos aplicativos 
-# na Microsoft Store e habilita atualizacoes automaticas 
-# para aplicativos ja instalados. Totalmente compativel
-# com Microsoft Intune.
-# ===============================================
+
+$ErrorActionPreference = 'Stop'
 
 try {
+    Write-Host "Aplicando políticas para Microsoft Store..."
 
-    # Habilita atualizações automáticas dos aplicativos da Microsoft Store
-    $autoUpdatePath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsStore\WindowsUpdate"
-    if (-not (Test-Path $autoUpdatePath)) {
-        New-Item -Path $autoUpdatePath -Force
-    }
-    Set-ItemProperty -Path $autoUpdatePath -Name "AutoDownload" -Value 4  # Habilita atualizações automáticas
-    Write-Host "Atualizações automáticas dos aplicativos da Store habilitadas."
-    # Define the registry path
-    $registryPath = "HKLM:\SOFTWARE\Policies\Microsoft\WindowsStore"
-
-    # Bloqueia a Store por chave de registro
-    $registryName = "RequirePrivateStoreOnly"
-    $registryValue = 1
-
-    # Verifica a existência do registro e os cria se não existir
-    if (-not (Test-Path $registryPath)) {
-        New-Item -Path $registryPath -Force
+    # 1) Políticas da Store
+    $storePolicyPath = "HKLM:\SOFTWARE\Policies\Microsoft\WindowsStore"
+    if (-not (Test-Path $storePolicyPath)) {
+        New-Item -Path $storePolicyPath -Force | Out-Null
     }
 
-    # Define o valor da chave de registro
-    Set-ItemProperty -Path $registryPath -Name $registryName -Value $registryValue -Type DWord
+    # Bloqueia o catálogo público da Store e força apenas loja privada
+    # (RequirePrivateStoreOnly = 1)
+    New-ItemProperty -Path $storePolicyPath -Name "RequirePrivateStoreOnly" `
+        -PropertyType DWord -Value 1 -Force | Out-Null
 
-    Write-Host "Chave de registro definida com sucesso."
-} catch {
-    Write-Host "Ocorreu um erro: $_"
+    # Tenta desabilitar o app da Store completamente onde suportado
+    # (RemoveWindowsStore = 1)
+    New-ItemProperty -Path $storePolicyPath -Name "RemoveWindowsStore" `
+        -PropertyType DWord -Value 1 -Force | Out-Null
+
+    # 2) Política extra usada por versões mais antigas / algumas builds
+    # NoWindowsStore = 1 (equivalente ao GPO "Turn off the Store application")
+    $explorerPolicyPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer"
+    if (-not (Test-Path $explorerPolicyPath)) {
+        New-Item -Path $explorerPolicyPath -Force | Out-Null
+    }
+
+    New-ItemProperty -Path $explorerPolicyPath -Name "NoWindowsStore" `
+        -PropertyType DWord -Value 1 -Force | Out-Null
+
+    # 3) Mantém ATUALIZAÇÕES automáticas dos apps
+    # A Store, por padrão, atualiza apps automaticamente.
+    # Políticas que usam 'AutoDownload' servem para DESLIGAR o auto-update. :contentReference[oaicite:1]{index=1}
+    # Então aqui apenas removemos qualquer AutoDownload que possa ter sido configurado.
+    if (Get-ItemProperty -Path $storePolicyPath -Name "AutoDownload" -ErrorAction SilentlyContinue) {
+        Remove-ItemProperty -Path $storePolicyPath -Name "AutoDownload" -ErrorAction SilentlyContinue
+        Write-Host "Removida política que alterava AutoDownload (apps voltam a atualizar automaticamente)."
+    }
+
+    Write-Host "Políticas aplicadas com sucesso. Reinicie o dispositivo ou rode 'gpupdate /force' para efetivar."
+}
+catch {
+    Write-Host "Ocorreu um erro ao aplicar as políticas: $_"
+    exit 1
 }
 
-
-# ===============================================
-# Fim do Script
-# ===============================================
+exit 0
